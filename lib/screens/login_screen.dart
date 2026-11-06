@@ -1,9 +1,8 @@
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../services/auth_service.dart';
 import 'register_screen.dart';
-import 'dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,7 +16,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  final AuthService _authService = AuthService();
+
   bool _loading = false;
+  bool _resetLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
 
@@ -32,20 +34,21 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await _authService.login(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
       if (!mounted) return;
 
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const DashboardScreen(),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Login successful! Welcome to SkillSwap.'),
         ),
-        (route) => false,
       );
+
+      // AuthGate automatically updates the Dashboard.
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } on FirebaseAuthException catch (e) {
       String message;
 
@@ -65,13 +68,25 @@ class _LoginScreenState extends State<LoginScreen> {
           message = 'Check your internet connection.';
           break;
         default:
-          message = e.message ?? 'Login failed. Please try again.';
+          message = 'Login failed. Please try again.';
       }
 
       if (mounted) {
         setState(() => _errorMessage = message);
       }
-    } catch (_) {
+    } on FirebaseException catch (e) {
+      debugPrint('Firestore login error: ${e.code} ${e.message}');
+
+      if (mounted) {
+        setState(() {
+          _errorMessage =
+              'Login succeeded, but profile could not be loaded. '
+              'Please check your internet or Firestore rules.';
+        });
+      }
+    } catch (e) {
+      debugPrint('Login error: $e');
+
       if (mounted) {
         setState(() {
           _errorMessage = 'Something went wrong. Please try again.';
@@ -85,31 +100,68 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _resetPassword() async {
+    FocusScope.of(context).unfocus();
+
     final email = _emailController.text.trim();
 
-    if (email.isEmpty ||
-        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
       setState(() {
-        _errorMessage = 'Enter your email first to reset password.';
+        _errorMessage = 'Enter a valid email address first.';
       });
       return;
     }
 
+    setState(() {
+      _resetLoading = true;
+      _errorMessage = null;
+    });
+
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      await _authService.sendPasswordResetEmail(email);
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Password reset email sent. Check your inbox.'),
+          content: Text(
+            'If an account exists for this email, a reset link has been sent.',
+          ),
         ),
       );
     } on FirebaseAuthException catch (e) {
+      String message;
+
+      switch (e.code) {
+        case 'invalid-email':
+          message = 'Please enter a valid email.';
+          break;
+        case 'user-not-found':
+          message = 'No account found for this email.';
+          break;
+        case 'network-request-failed':
+          message = 'Check your internet connection.';
+          break;
+        case 'too-many-requests':
+          message = 'Too many requests. Try again later.';
+          break;
+        default:
+          message = 'Could not send reset email. Please try again.';
+      }
+
+      if (mounted) {
+        setState(() => _errorMessage = message);
+      }
+    } catch (e) {
+      debugPrint('Password reset error: $e');
+
       if (mounted) {
         setState(() {
-          _errorMessage = e.message ?? 'Could not send reset email.';
+          _errorMessage = 'Something went wrong. Please try again.';
         });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _resetLoading = false);
       }
     }
   }
@@ -209,8 +261,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: _loading ? null : _resetPassword,
-                        child: const Text('Forgot password?'),
+                        onPressed: (_loading || _resetLoading)
+                            ? null
+                            : _resetPassword,
+                        child: _resetLoading
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Forgot password?'),
                       ),
                     ),
 
@@ -225,7 +287,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     SizedBox(
                       height: 52,
                       child: FilledButton(
-                        onPressed: _loading ? null : _login,
+                        onPressed: _loading || _resetLoading ? null : _login,
                         child: _loading
                             ? const SizedBox(
                                 height: 22,
@@ -244,17 +306,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
 
                     TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RegisterScreen(),
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        "Don't have an account? Register",
-                      ),
+                      onPressed: _loading
+                          ? null
+                          : () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const RegisterScreen(),
+                                ),
+                              );
+                            },
+                      child: const Text("Don't have an account? Register"),
                     ),
                   ],
                 ),

@@ -4,6 +4,10 @@ import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 import 'skill_discovery_screen.dart';
+import 'edit_profile_screen.dart';
+import 'my_skills_screen.dart';
+import 'sessions_screen.dart';
+import 'exchange_requests_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -17,7 +21,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   final AuthService _authService = AuthService();
 
-  // Home page sample skills
   final List<Map<String, dynamic>> _skills = [
     {
       'title': 'Flutter Development',
@@ -91,23 +94,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return _authService.currentUser?.email ?? '';
   }
 
-  // Login navigation
   void _openLogin() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const LoginScreen()),
-    );
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
-  // Register navigation
   void _openRegister() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const RegisterScreen()),
-    );
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
-  // Logout
   Future<void> _logout() async {
     try {
       await _authService.logout();
@@ -130,7 +134,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // Login required dialog
   void _showLoginRequired() {
     showDialog(
       context: context,
@@ -145,9 +148,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-              },
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
             TextButton(
@@ -170,9 +171,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Bottom navigation
   void _onItemTapped(int index) {
-    if ((index == 2 || index == 3) && !_isLoggedIn) {
+    if ((index == 2 || index == 3 || index == 4) && !_isLoggedIn) {
       _showLoginRequired();
       return;
     }
@@ -188,17 +188,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _buildHomePage(),
       _buildExplorePage(),
       _buildSessionsPage(),
+      const ExchangeRequestsScreen(),
       _buildProfilePage(),
     ];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FD),
-
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-
         title: Row(
           children: [
             Container(
@@ -224,13 +223,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ],
         ),
-
         actions: [
           if (_isLoggedIn)
             IconButton(
-              onPressed: () {
-                _showComingSoon('Notifications');
-              },
+              onPressed: () => _showComingSoon('Notifications'),
               icon: const Icon(
                 Icons.notifications_none,
                 color: Color(0xFF22223A),
@@ -248,9 +244,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ],
       ),
-
       body: IndexedStack(index: _selectedIndex, children: pages),
-
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -289,6 +283,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               label: 'Sessions',
             ),
             BottomNavigationBarItem(
+              icon: Icon(Icons.swap_horiz),
+              activeIcon: Icon(Icons.swap_horiz),
+              label: 'Requests',
+            ),
+            BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person),
               label: 'Profile',
@@ -299,9 +298,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ==================================================
   // HOME PAGE
-  // ==================================================
 
   Widget _buildHomePage() {
     return SingleChildScrollView(
@@ -310,7 +307,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 8),
-
           Text(
             _isLoggedIn
                 ? 'Welcome back, $_userName!'
@@ -321,19 +317,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Color(0xFF22223A),
             ),
           ),
-
           const SizedBox(height: 8),
-
           Text(
             _isLoggedIn
                 ? 'Continue your learning journey.'
                 : 'Learn something new. Share what you know.',
             style: const TextStyle(fontSize: 14, color: Colors.grey),
           ),
-
           const SizedBox(height: 24),
-
-          // Main banner
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(22),
@@ -357,9 +348,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     height: 1.3,
                   ),
                 ),
-
                 const SizedBox(height: 10),
-
                 const Text(
                   'Discover new skills and connect with people who love learning.',
                   style: TextStyle(
@@ -368,9 +357,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     height: 1.5,
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 ElevatedButton(
                   onPressed: () {
                     setState(() {
@@ -396,10 +383,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
           ),
-
           const SizedBox(height: 25),
-
-          // Statistics
           Row(
             children: [
               Expanded(
@@ -415,17 +399,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
-
           const SizedBox(height: 28),
-
           _buildSectionTitle('Popular Skills', 'Explore', () {
             setState(() {
               _selectedIndex = 1;
             });
           }),
-
           const SizedBox(height: 15),
-
           SizedBox(
             height: 205,
             child: ListView.builder(
@@ -436,9 +416,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               },
             ),
           ),
-
           const SizedBox(height: 28),
-
           if (!_isLoggedIn)
             Container(
               width: double.infinity,
@@ -455,16 +433,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     'Become a SkillSwap Member',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-
                   const SizedBox(height: 8),
-
                   const Text(
                     'Create an account to connect with learners, teach skills and schedule learning sessions.',
                     style: TextStyle(color: Colors.grey, height: 1.5),
                   ),
-
                   const SizedBox(height: 16),
-
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -483,111 +457,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ],
               ),
             ),
-
           const SizedBox(height: 25),
         ],
       ),
     );
   }
 
-  // ==================================================
-  // EXPLORE PAGE - FIRESTORE SKILL DISCOVERY
-  // ==================================================
+  // EXPLORE PAGE
 
   Widget _buildExplorePage() {
     return const SkillDiscoveryScreen();
   }
 
-  // ==================================================
   // SESSIONS PAGE
-  // ==================================================
 
   Widget _buildSessionsPage() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'My Sessions',
-            style: TextStyle(
-              fontSize: 25,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF22223A),
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          const Text(
-            'Manage your learning sessions.',
-            style: TextStyle(color: Colors.grey, fontSize: 14),
-          ),
-
-          const SizedBox(height: 25),
-
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(30),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF5B5FEF).withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.calendar_month_outlined,
-                    size: 45,
-                    color: Color(0xFF5B5FEF),
-                  ),
-                ),
-
-                const SizedBox(height: 18),
-
-                const Text(
-                  'No Sessions Yet',
-                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
-                ),
-
-                const SizedBox(height: 10),
-
-                const Text(
-                  'Your scheduled learning sessions will appear here.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey, height: 1.5),
-                ),
-
-                const SizedBox(height: 20),
-
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _selectedIndex = 1;
-                    });
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF5B5FEF),
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Explore Skills'),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+    return const SessionsScreen();
   }
 
-  // ==================================================
   // PROFILE PAGE
-  // ==================================================
 
   Widget _buildProfilePage() {
     return SingleChildScrollView(
@@ -603,9 +491,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Color(0xFF22223A),
             ),
           ),
-
           const SizedBox(height: 25),
-
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(22),
@@ -627,9 +513,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 15),
-
                 Text(
                   _userName,
                   style: const TextStyle(
@@ -637,38 +521,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-
                 const SizedBox(height: 5),
-
                 Text(
                   _userEmail,
                   style: const TextStyle(color: Colors.grey, fontSize: 14),
                 ),
-
                 const SizedBox(height: 18),
-
                 const Divider(),
+                _buildProfileOption(
+                  Icons.person_outline,
+                  'Edit Profile',
+                  () async {
+                    final updated = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EditProfileScreen(),
+                      ),
+                    );
 
-                _buildProfileOption(Icons.person_outline, 'Edit Profile', () {
-                  _showComingSoon('Edit Profile');
-                }),
+                    if (updated == true && mounted) {
+                      setState(() {});
+                    }
+                  },
+                ),
+                _buildProfileOption(
+                  Icons.school_outlined,
+                  'My Skills',
+                  () async {
+                    final updated = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MySkillsScreen(),
+                      ),
+                    );
 
-                _buildProfileOption(Icons.school_outlined, 'My Skills', () {
-                  _showComingSoon('My Skills');
-                }),
-
-                _buildProfileOption(Icons.settings_outlined, 'Settings', () {
-                  _showComingSoon('Settings');
-                }),
-
+                    if (updated == true && mounted) {
+                      setState(() {});
+                    }
+                  },
+                ),
+                _buildProfileOption(
+                  Icons.settings_outlined,
+                  'Settings',
+                  () => _showComingSoon('Settings'),
+                ),
                 _buildProfileOption(
                   Icons.info_outline,
                   'About SkillSwap',
                   _showAboutDialog,
                 ),
-
                 const Divider(),
-
                 _buildProfileOption(
                   Icons.logout,
                   'Logout',
@@ -683,9 +585,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ==================================================
   // REUSABLE WIDGETS
-  // ==================================================
 
   Widget _buildStatCard(String title, String value, IconData icon) {
     return Container(
@@ -698,16 +598,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: const Color(0xFF5B5FEF), size: 25),
-
           const SizedBox(height: 12),
-
           Text(
             value,
             style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
           ),
-
           const SizedBox(height: 4),
-
           Text(title, style: const TextStyle(color: Colors.grey, fontSize: 13)),
         ],
       ),
@@ -763,25 +659,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
               size: 25,
             ),
           ),
-
           const SizedBox(height: 12),
-
           Text(
-            skill['title'],
+            skill['title'] as String,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
-
           const SizedBox(height: 5),
-
           Text(
-            skill['category'],
+            skill['category'] as String,
             style: const TextStyle(color: Colors.grey, fontSize: 12),
           ),
-
           const Spacer(),
-
           Text(
             'By ${skill['teacher']}',
             maxLines: 1,
@@ -819,9 +709,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ==================================================
   // DIALOGS
-  // ==================================================
 
   void _showComingSoon(String feature) {
     ScaffoldMessenger.of(

@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/skill_discovery_service.dart';
+import '../services/exchange_request_service.dart';
 import 'public_user_profile_screen.dart';
 
 class SkillDiscoveryScreen extends StatefulWidget {
@@ -14,6 +15,9 @@ class SkillDiscoveryScreen extends StatefulWidget {
 class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
   final SkillDiscoveryService _discoveryService = SkillDiscoveryService();
 
+  final ExchangeRequestService _exchangeRequestService =
+      ExchangeRequestService();
+
   final TextEditingController _searchController = TextEditingController();
 
   String _selectedFilter = 'All';
@@ -24,21 +28,17 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     List<Map<String, dynamic>> profiles,
   ) {
     final query = _searchController.text.trim().toLowerCase();
-
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
 
     return profiles.where((profile) {
-      // Hide own profile from discovery
       if (profile['uid'] == currentUid) {
         return false;
       }
 
       final name = (profile['name'] ?? '').toString().toLowerCase();
-
       final bio = (profile['bio'] ?? '').toString().toLowerCase();
 
       final teach = List<String>.from(profile['skillsToTeach'] ?? []);
-
       final learn = List<String>.from(profile['skillsToLearn'] ?? []);
 
       final teachMatch = teach.any(
@@ -90,7 +90,6 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Search Field
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: TextField(
@@ -115,8 +114,6 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                 ),
               ),
             ),
-
-            // Filter Chips
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
@@ -129,8 +126,6 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                 ],
               ),
             ),
-
-            // User List
             Expanded(
               child: StreamBuilder<List<Map<String, dynamic>>>(
                 stream: _discoveryService.getPublicProfiles(),
@@ -154,7 +149,6 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                   }
 
                   final profiles = snapshot.data ?? [];
-
                   final filteredProfiles = _filterProfiles(profiles);
 
                   if (filteredProfiles.isEmpty) {
@@ -185,9 +179,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                     padding: const EdgeInsets.all(16),
                     itemCount: filteredProfiles.length,
                     itemBuilder: (context, index) {
-                      final profile = filteredProfiles[index];
-
-                      return _buildProfileCard(profile);
+                      return _buildProfileCard(filteredProfiles[index]);
                     },
                   );
                 },
@@ -198,6 +190,10 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
       ),
     );
   }
+
+  // ==========================================
+  // FILTER CHIP
+  // ==========================================
 
   Widget _buildFilterChip(String label) {
     final selected = _selectedFilter == label;
@@ -217,6 +213,275 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
       },
     );
   }
+
+  // ==========================================
+  // SEND EXCHANGE REQUEST
+  // ==========================================
+
+  Future<void> _showExchangeRequestDialog(Map<String, dynamic> profile) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to send an exchange request.'),
+        ),
+      );
+      return;
+    }
+
+    final receiverId = (profile['uid'] ?? '').toString();
+
+    if (receiverId.isEmpty || receiverId == currentUser.uid) {
+      return;
+    }
+
+    final receiverSkills = List<String>.from(profile['skillsToTeach'] ?? []);
+
+    if (receiverSkills.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This user has not added any teaching skills.'),
+        ),
+      );
+      return;
+    }
+
+    Map<String, dynamic> ownProfile;
+
+    try {
+      ownProfile = await _exchangeRequestService.getCurrentUserProfile();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    final offeredSkills = List<String>.from(ownProfile['skillsToTeach'] ?? []);
+
+    if (offeredSkills.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please add a skill in My Skills before sending a request.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    String selectedOfferedSkill = offeredSkills.first;
+    String selectedRequestedSkill = receiverSkills.first;
+
+    final noteController = TextEditingController();
+
+    bool isSending = false;
+
+    try {
+      await showDialog(
+        context: context,
+        barrierDismissible: !isSending,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (dialogContext, setDialogState) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                title: const Text(
+                  'Send Exchange Request',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Send a skill exchange request to ${profile['name'] ?? 'this user'}.',
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      const Text(
+                        'Your Offered Skill',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedOfferedSkill,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                        items: offeredSkills.map((skill) {
+                          return DropdownMenuItem(
+                            value: skill,
+                            child: Text(skill, overflow: TextOverflow.ellipsis),
+                          );
+                        }).toList(),
+                        onChanged: isSending
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  setDialogState(() {
+                                    selectedOfferedSkill = value;
+                                  });
+                                }
+                              },
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Skill You Want to Learn',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedRequestedSkill,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                        items: receiverSkills.map((skill) {
+                          return DropdownMenuItem(
+                            value: skill,
+                            child: Text(skill, overflow: TextOverflow.ellipsis),
+                          );
+                        }).toList(),
+                        onChanged: isSending
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  setDialogState(() {
+                                    selectedRequestedSkill = value;
+                                  });
+                                }
+                              },
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Message (Optional)',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: noteController,
+                        enabled: !isSending,
+                        maxLength: 250,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          hintText: 'Write a short message...',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: isSending
+                        ? null
+                        : () => Navigator.of(dialogContext).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: isSending
+                        ? null
+                        : () async {
+                            setDialogState(() {
+                              isSending = true;
+                            });
+
+                            try {
+                              await _exchangeRequestService.sendRequest(
+                                receiverId: receiverId,
+                                requestedSkill: selectedRequestedSkill,
+                                offeredSkill: selectedOfferedSkill,
+                                note: noteController.text.trim(),
+                              );
+
+                              if (!mounted || !dialogContext.mounted) {
+                                return;
+                              }
+
+                              Navigator.of(dialogContext).pop();
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Exchange request sent successfully.',
+                                  ),
+                                ),
+                              );
+                            } catch (e) {
+                              if (!dialogContext.mounted) return;
+
+                              setDialogState(() {
+                                isSending = false;
+                              });
+
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    e.toString().replaceFirst(
+                                      'Exception: ',
+                                      '',
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                    child: isSending
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Send Request'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      noteController.dispose();
+    }
+  }
+
+  // ==========================================
+  // PROFILE CARD
+  // ==========================================
 
   Widget _buildProfileCard(Map<String, dynamic> profile) {
     final name = (profile['name'] ?? 'SkillSwap User').toString();
@@ -295,34 +560,47 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 16),
-
               const Text(
                 'Skills Teaching',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-
               const SizedBox(height: 8),
-
               _buildSkillTags(skillsToTeach),
-
               const SizedBox(height: 14),
-
               const Text(
                 'Skills Learning',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-
               const SizedBox(height: 8),
-
               _buildSkillTags(skillsToLearn),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _showExchangeRequestDialog(profile),
+                  icon: const Icon(Icons.swap_horiz),
+                  label: const Text('Send Exchange Request'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+
+  // ==========================================
+  // SKILL TAGS
+  // ==========================================
 
   Widget _buildSkillTags(List<String> skills) {
     if (skills.isEmpty) {

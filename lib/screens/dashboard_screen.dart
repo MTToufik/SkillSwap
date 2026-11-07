@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 import 'skill_discovery_screen.dart';
+import 'chat_list_screen.dart';
 import 'edit_profile_screen.dart';
 import 'my_skills_screen.dart';
 import 'sessions_screen.dart';
@@ -171,8 +172,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // CHAT, SESSIONS, REQUESTS AND PROFILE REQUIRE LOGIN.
   void _onItemTapped(int index) {
-    if ((index == 2 || index == 3 || index == 4) && !_isLoggedIn) {
+    if (index >= 2 && !_isLoggedIn) {
       _showLoginRequired();
       return;
     }
@@ -187,6 +189,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final List<Widget> pages = [
       _buildHomePage(),
       _buildExplorePage(),
+      const ChatListScreen(),
       _buildSessionsPage(),
       const ExchangeRequestsScreen(),
       _buildProfilePage(),
@@ -278,6 +281,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               label: 'Explore',
             ),
             BottomNavigationBarItem(
+              icon: Icon(Icons.chat_bubble_outline),
+              activeIcon: Icon(Icons.chat_bubble),
+              label: 'Chats',
+            ),
+            BottomNavigationBarItem(
               icon: Icon(Icons.calendar_month_outlined),
               activeIcon: Icon(Icons.calendar_month),
               label: 'Sessions',
@@ -298,7 +306,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ==========================================
   // HOME PAGE
+  // ==========================================
 
   Widget _buildHomePage() {
     return SingleChildScrollView(
@@ -463,19 +473,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ==========================================
   // EXPLORE PAGE
+  // ==========================================
 
   Widget _buildExplorePage() {
     return const SkillDiscoveryScreen();
   }
 
+  // ==========================================
   // SESSIONS PAGE
+  // ==========================================
 
   Widget _buildSessionsPage() {
     return const SessionsScreen();
   }
 
+  // ==========================================
   // PROFILE PAGE
+  // ==========================================
 
   Widget _buildProfilePage() {
     return SingleChildScrollView(
@@ -585,7 +601,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ==========================================
   // REUSABLE WIDGETS
+  // ==========================================
 
   Widget _buildStatCard(String title, String value, IconData icon) {
     return Container(
@@ -709,7 +727,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ==========================================
   // DIALOGS
+  // ==========================================
 
   void _showComingSoon(String feature) {
     ScaffoldMessenger.of(

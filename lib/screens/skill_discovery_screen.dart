@@ -20,25 +20,59 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
 
   final TextEditingController _searchController = TextEditingController();
 
+  late Future<Map<String, dynamic>?> _myProfileFuture;
+
   String _selectedFilter = 'All';
 
   final Color primaryColor = const Color(0xFF5B5FEF);
 
+  // ==========================================
+  // INITIALIZE
+  // ==========================================
+
+  @override
+  void initState() {
+    super.initState();
+
+    _myProfileFuture = _discoveryService.getCurrentUserProfile();
+  }
+
+  // ==========================================
+  // REFRESH CURRENT PROFILE
+  // ==========================================
+
+  void _refreshMyProfile() {
+    setState(() {
+      _myProfileFuture = _discoveryService.getCurrentUserProfile();
+    });
+  }
+
+  // ==========================================
+  // FILTER AND SORT PROFILES
+  // ==========================================
+
   List<Map<String, dynamic>> _filterProfiles(
     List<Map<String, dynamic>> profiles,
+    Map<String, dynamic> currentProfile,
   ) {
     final query = _searchController.text.trim().toLowerCase();
+
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
 
-    return profiles.where((profile) {
+    final result = <Map<String, dynamic>>[];
+
+    for (final profile in profiles) {
+      // Do not show current user.
       if (profile['uid'] == currentUid) {
-        return false;
+        continue;
       }
 
       final name = (profile['name'] ?? '').toString().toLowerCase();
+
       final bio = (profile['bio'] ?? '').toString().toLowerCase();
 
       final teach = List<String>.from(profile['skillsToTeach'] ?? []);
+
       final learn = List<String>.from(profile['skillsToLearn'] ?? []);
 
       final teachMatch = teach.any(
@@ -56,17 +90,44 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
           teachMatch ||
           learnMatch;
 
+      // Calculate complementary match.
+      final matchDetails = _discoveryService.calculateMatch(
+        currentProfile,
+        profile,
+      );
+
+      final matchScore = matchDetails['score'] as int;
+
       bool filterMatch = true;
 
       if (_selectedFilter == 'Teaching') {
         filterMatch = teach.isNotEmpty && (query.isEmpty || teachMatch);
       } else if (_selectedFilter == 'Learning') {
         filterMatch = learn.isNotEmpty && (query.isEmpty || learnMatch);
+      } else if (_selectedFilter == 'Matches') {
+        filterMatch = matchScore > 0;
       }
 
-      return textMatch && filterMatch;
-    }).toList();
+      if (textMatch && filterMatch) {
+        result.add({...profile, 'matchDetails': matchDetails});
+      }
+    }
+
+    // Highest match score first.
+    result.sort((a, b) {
+      final scoreA = a['matchDetails']['score'] as int;
+
+      final scoreB = b['matchDetails']['score'] as int;
+
+      return scoreB.compareTo(scoreA);
+    });
+
+    return result;
   }
+
+  // ==========================================
+  // DISPOSE
+  // ==========================================
 
   @override
   void dispose() {
@@ -74,10 +135,15 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     super.dispose();
   }
 
+  // ==========================================
+  // BUILD
+  // ==========================================
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7FC),
+
       appBar: AppBar(
         title: const Text(
           'Discover Skills',
@@ -87,17 +153,22 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
         elevation: 0,
         foregroundColor: Colors.black87,
       ),
+
       body: SafeArea(
         child: Column(
           children: [
+            // SEARCH FIELD
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: TextField(
                 controller: _searchController,
-                onChanged: (_) => setState(() {}),
+                onChanged: (_) {
+                  setState(() {});
+                },
                 decoration: InputDecoration(
                   hintText: 'Search name or skills...',
                   prefixIcon: const Icon(Icons.search),
+
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.clear),
                     onPressed: () {
@@ -105,8 +176,10 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                       setState(() {});
                     },
                   ),
+
                   filled: true,
                   fillColor: Colors.white,
+
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide.none,
@@ -114,76 +187,199 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                 ),
               ),
             ),
+
+            // FILTER CHIPS
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  _buildFilterChip('All'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Teaching'),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('Learning'),
-                ],
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildFilterChip('All'),
+                    const SizedBox(width: 8),
+
+                    _buildFilterChip('Matches'),
+                    const SizedBox(width: 8),
+
+                    _buildFilterChip('Teaching'),
+                    const SizedBox(width: 8),
+
+                    _buildFilterChip('Learning'),
+                  ],
+                ),
               ),
             ),
+
+            // PROFILE STREAM
             Expanded(
-              child: StreamBuilder<List<Map<String, dynamic>>>(
-                stream: _discoveryService.getPublicProfiles(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+              child: FutureBuilder<Map<String, dynamic>?>(
+                future: _myProfileFuture,
+
+                builder: (context, myProfileSnapshot) {
+                  if (myProfileSnapshot.connectionState ==
+                      ConnectionState.waiting) {
                     return Center(
                       child: CircularProgressIndicator(color: primaryColor),
                     );
                   }
 
-                  if (snapshot.hasError) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text(
+                  if (myProfileSnapshot.hasError) {
+                    return _buildErrorState('Unable to load your profile.');
+                  }
+
+                  final currentProfile = myProfileSnapshot.data;
+
+                  if (currentProfile == null) {
+                    return _buildMissingProfileState();
+                  }
+
+                  return StreamBuilder<List<Map<String, dynamic>>>(
+                    stream: _discoveryService.getPublicProfiles(),
+
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(
+                          child: CircularProgressIndicator(color: primaryColor),
+                        );
+                      }
+
+                      if (snapshot.hasError) {
+                        return _buildErrorState(
                           'Unable to load profiles. Please try again.',
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    );
-                  }
+                        );
+                      }
 
-                  final profiles = snapshot.data ?? [];
-                  final filteredProfiles = _filterProfiles(profiles);
+                      final profiles = snapshot.data ?? [];
 
-                  if (filteredProfiles.isEmpty) {
-                    return const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.search_off, size: 60, color: Colors.grey),
-                          SizedBox(height: 12),
-                          Text(
-                            'No matching skills found.',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          SizedBox(height: 6),
-                          Text(
-                            'Try another search or filter.',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
+                      final filteredProfiles = _filterProfiles(
+                        profiles,
+                        currentProfile,
+                      );
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: filteredProfiles.length,
-                    itemBuilder: (context, index) {
-                      return _buildProfileCard(filteredProfiles[index]);
+                      if (filteredProfiles.isEmpty) {
+                        return _buildEmptyState();
+                      }
+
+                      return ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: filteredProfiles.length,
+
+                        itemBuilder: (context, index) {
+                          return _buildProfileCard(filteredProfiles[index]);
+                        },
+                      );
                     },
                   );
                 },
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==========================================
+  // ERROR STATE
+  // ==========================================
+
+  Widget _buildErrorState(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 55, color: Colors.redAccent),
+
+            const SizedBox(height: 12),
+
+            Text(message, textAlign: TextAlign.center),
+
+            const SizedBox(height: 16),
+
+            ElevatedButton(
+              onPressed: _refreshMyProfile,
+              child: const Text('Try Again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==========================================
+  // MISSING PROFILE STATE
+  // ==========================================
+
+  Widget _buildMissingProfileState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.person_outline, size: 60, color: Colors.grey),
+
+            const SizedBox(height: 12),
+
+            const Text(
+              'Your public profile was not found.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+
+            const SizedBox(height: 8),
+
+            const Text(
+              'Please complete your profile before discovering skill matches.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
+            ),
+
+            const SizedBox(height: 16),
+
+            ElevatedButton(
+              onPressed: _refreshMyProfile,
+              child: const Text('Refresh Profile'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==========================================
+  // EMPTY STATE
+  // ==========================================
+
+  Widget _buildEmptyState() {
+    final isMatchFilter = _selectedFilter == 'Matches';
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.search_off, size: 60, color: Colors.grey),
+
+            const SizedBox(height: 12),
+
+            Text(
+              isMatchFilter
+                  ? 'No complementary matches found.'
+                  : 'No matching skills found.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+
+            const SizedBox(height: 6),
+
+            const Text(
+              'Try another search or update your skills.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
             ),
           ],
         ),
@@ -201,16 +397,235 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     return ChoiceChip(
       label: Text(label),
       selected: selected,
+
       selectedColor: primaryColor.withValues(alpha: 0.15),
+
       labelStyle: TextStyle(
         color: selected ? primaryColor : Colors.black87,
         fontWeight: FontWeight.w600,
       ),
+
       onSelected: (_) {
         setState(() {
           _selectedFilter = label;
         });
       },
+    );
+  }
+
+  // ==========================================
+  // MATCH SCORE COLOR
+  // ==========================================
+
+  Color _getMatchColor(int score) {
+    if (score == 100) {
+      return Colors.green;
+    }
+
+    if (score == 50) {
+      return Colors.orange;
+    }
+
+    return Colors.grey;
+  }
+
+  // ==========================================
+  // MATCH SCORE BADGE
+  // ==========================================
+
+  Widget _buildMatchBadge(int score) {
+    final color = _getMatchColor(score);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(20),
+      ),
+
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.auto_awesome, color: color, size: 15),
+
+          const SizedBox(width: 5),
+
+          Text(
+            '$score% Match',
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // MATCH DETAILS DIALOG
+  // ==========================================
+
+  void _showMatchDetailsDialog(Map<String, dynamic> profile) {
+    final matchDetails = Map<String, dynamic>.from(
+      profile['matchDetails'] ?? {},
+    );
+
+    final score = matchDetails['score'] as int? ?? 0;
+
+    final teachToLearn = List<String>.from(matchDetails['teachToLearn'] ?? []);
+
+    final learnFromTeach = List<String>.from(
+      matchDetails['learnFromTeach'] ?? [],
+    );
+
+    showDialog<void>(
+      context: context,
+
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+
+          title: const Text(
+            'Match Details',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Column(
+                    children: [
+                      Text(
+                        '$score%',
+                        style: TextStyle(
+                          fontSize: 38,
+                          fontWeight: FontWeight.bold,
+                          color: _getMatchColor(score),
+                        ),
+                      ),
+
+                      const Text(
+                        'Compatibility Score',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                _buildMatchDetailSection(
+                  title: 'You Teach → They Learn',
+                  skills: teachToLearn,
+                  color: Colors.green,
+                ),
+
+                const SizedBox(height: 18),
+
+                _buildMatchDetailSection(
+                  title: 'They Teach → You Learn',
+                  skills: learnFromTeach,
+                  color: Colors.blue,
+                ),
+
+                const SizedBox(height: 16),
+
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+
+                  decoration: BoxDecoration(
+                    color: primaryColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+
+                  child: Text(
+                    score == 100
+                        ? 'Excellent! Both users can teach and learn from each other.'
+                        : score == 50
+                        ? 'Partial match found. One direction of skill exchange is compatible.'
+                        : 'No complementary skill exchange found yet.',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ==========================================
+  // MATCH DETAIL SECTION
+  // ==========================================
+
+  Widget _buildMatchDetailSection({
+    required String title,
+    required List<String> skills,
+    required Color color,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+
+        const SizedBox(height: 9),
+
+        if (skills.isEmpty)
+          const Text(
+            'No matching skills.',
+            style: TextStyle(color: Colors.grey, fontSize: 13),
+          )
+        else
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+
+            children: skills.map((skill) {
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
+                ),
+
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+
+                child: Text(
+                  skill,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+      ],
     );
   }
 
@@ -227,6 +642,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
           content: Text('Please login to send an exchange request.'),
         ),
       );
+
       return;
     }
 
@@ -244,6 +660,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
           content: Text('This user has not added any teaching skills.'),
         ),
       );
+
       return;
     }
 
@@ -257,6 +674,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
       );
+
       return;
     }
 
@@ -272,10 +690,12 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
           ),
         ),
       );
+
       return;
     }
 
     String selectedOfferedSkill = offeredSkills.first;
+
     String selectedRequestedSkill = receiverSkills.first;
 
     final noteController = TextEditingController();
@@ -283,9 +703,12 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     bool isSending = false;
 
     try {
-      await showDialog(
+      await showDialog<void>(
         context: context,
-        barrierDismissible: !isSending,
+
+        // Prevent accidental dismissal during sending.
+        barrierDismissible: false,
+
         builder: (dialogContext) {
           return StatefulBuilder(
             builder: (dialogContext, setDialogState) {
@@ -293,10 +716,12 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(18),
                 ),
+
                 title: const Text(
                   'Send Exchange Request',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
+
                 content: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -309,30 +734,39 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                           fontSize: 13,
                         ),
                       ),
+
                       const SizedBox(height: 18),
+
                       const Text(
                         'Your Offered Skill',
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
+
                       const SizedBox(height: 8),
+
                       DropdownButtonFormField<String>(
                         initialValue: selectedOfferedSkill,
+
                         isExpanded: true,
+
                         decoration: InputDecoration(
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
+
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 12,
                           ),
                         ),
+
                         items: offeredSkills.map((skill) {
                           return DropdownMenuItem(
                             value: skill,
                             child: Text(skill, overflow: TextOverflow.ellipsis),
                           );
                         }).toList(),
+
                         onChanged: isSending
                             ? null
                             : (value) {
@@ -343,30 +777,39 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                                 }
                               },
                       ),
+
                       const SizedBox(height: 16),
+
                       const Text(
                         'Skill You Want to Learn',
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
+
                       const SizedBox(height: 8),
+
                       DropdownButtonFormField<String>(
                         initialValue: selectedRequestedSkill,
+
                         isExpanded: true,
+
                         decoration: InputDecoration(
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
+
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 12,
                           ),
                         ),
+
                         items: receiverSkills.map((skill) {
                           return DropdownMenuItem(
                             value: skill,
                             child: Text(skill, overflow: TextOverflow.ellipsis),
                           );
                         }).toList(),
+
                         onChanged: isSending
                             ? null
                             : (value) {
@@ -377,19 +820,25 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                                 }
                               },
                       ),
+
                       const SizedBox(height: 16),
+
                       const Text(
                         'Message (Optional)',
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
+
                       const SizedBox(height: 8),
+
                       TextField(
                         controller: noteController,
                         enabled: !isSending,
                         maxLength: 250,
                         maxLines: 3,
+
                         decoration: InputDecoration(
                           hintText: 'Write a short message...',
+
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -398,18 +847,24 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                     ],
                   ),
                 ),
+
                 actions: [
                   TextButton(
                     onPressed: isSending
                         ? null
-                        : () => Navigator.of(dialogContext).pop(),
+                        : () {
+                            Navigator.of(dialogContext).pop();
+                          },
+
                     child: const Text('Cancel'),
                   ),
+
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
                       foregroundColor: Colors.white,
                     ),
+
                     onPressed: isSending
                         ? null
                         : () async {
@@ -431,6 +886,8 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
 
                               Navigator.of(dialogContext).pop();
 
+                              if (!mounted) return;
+
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
@@ -439,7 +896,9 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                                 ),
                               );
                             } catch (e) {
-                              if (!dialogContext.mounted) return;
+                              if (!dialogContext.mounted) {
+                                return;
+                              }
 
                               setDialogState(() {
                                 isSending = false;
@@ -457,6 +916,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                               );
                             }
                           },
+
                     child: isSending
                         ? const SizedBox(
                             height: 18,
@@ -492,15 +952,25 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
 
     final skillsToLearn = List<String>.from(profile['skillsToLearn'] ?? []);
 
+    final matchDetails = Map<String, dynamic>.from(
+      profile['matchDetails'] ?? {},
+    );
+
+    final matchScore = matchDetails['score'] as int? ?? 0;
+
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
 
     return Card(
       color: Colors.white,
       elevation: 1,
+
       margin: const EdgeInsets.only(bottom: 14),
+
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
+
         onTap: () {
           Navigator.push(
             context,
@@ -509,18 +979,25 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
             ),
           );
         },
+
         child: Padding(
           padding: const EdgeInsets.all(16),
+
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+
             children: [
+              // USER INFORMATION
               Row(
                 children: [
                   CircleAvatar(
                     radius: 25,
+
                     backgroundColor: primaryColor.withValues(alpha: 0.12),
+
                     child: Text(
                       initial,
+
                       style: TextStyle(
                         fontSize: 21,
                         fontWeight: FontWeight.bold,
@@ -528,23 +1005,30 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                       ),
                     ),
                   ),
+
                   const SizedBox(width: 12),
+
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+
                       children: [
                         Text(
                           name,
+
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+
                         const SizedBox(height: 4),
+
                         Text(
                           bio,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
+
                           style: const TextStyle(
                             color: Colors.grey,
                             fontSize: 13,
@@ -553,6 +1037,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                       ],
                     ),
                   ),
+
                   const Icon(
                     Icons.arrow_forward_ios,
                     size: 16,
@@ -560,31 +1045,95 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 16),
+
+              // MATCH SCORE
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+                children: [
+                  const Text(
+                    'Skill Compatibility',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+
+                  _buildMatchBadge(matchScore),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+
+                child: LinearProgressIndicator(
+                  value: matchScore / 100,
+                  minHeight: 7,
+                  backgroundColor: Colors.grey.shade200,
+                  color: _getMatchColor(matchScore),
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              Align(
+                alignment: Alignment.centerRight,
+
+                child: TextButton(
+                  onPressed: () {
+                    _showMatchDetailsDialog(profile);
+                  },
+
+                  child: const Text('View Match Details'),
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              // TEACHING SKILLS
               const Text(
                 'Skills Teaching',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
+
               const SizedBox(height: 8),
+
               _buildSkillTags(skillsToTeach),
+
               const SizedBox(height: 14),
+
+              // LEARNING SKILLS
               const Text(
                 'Skills Learning',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
+
               const SizedBox(height: 8),
+
               _buildSkillTags(skillsToLearn),
+
               const SizedBox(height: 16),
+
+              // SEND REQUEST
               SizedBox(
                 width: double.infinity,
+
                 child: ElevatedButton.icon(
-                  onPressed: () => _showExchangeRequestDialog(profile),
+                  onPressed: () {
+                    _showExchangeRequestDialog(profile);
+                  },
+
                   icon: const Icon(Icons.swap_horiz),
+
                   label: const Text('Send Exchange Request'),
+
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,
                     foregroundColor: Colors.white,
+
                     padding: const EdgeInsets.symmetric(vertical: 12),
+
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -613,15 +1162,20 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
+
       children: skills.map((skill) {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+
           decoration: BoxDecoration(
             color: primaryColor.withValues(alpha: 0.09),
+
             borderRadius: BorderRadius.circular(20),
           ),
+
           child: Text(
             skill,
+
             style: TextStyle(
               color: primaryColor,
               fontSize: 12,

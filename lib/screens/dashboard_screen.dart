@@ -306,9 +306,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ==========================================
+
   // HOME PAGE
-  // ==========================================
+ 
 
   Widget _buildHomePage() {
     return SingleChildScrollView(
@@ -473,25 +473,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ==========================================
+
   // EXPLORE PAGE
-  // ==========================================
+ 
 
   Widget _buildExplorePage() {
     return const SkillDiscoveryScreen();
   }
 
-  // ==========================================
+ 
   // SESSIONS PAGE
-  // ==========================================
+
 
   Widget _buildSessionsPage() {
     return const SessionsScreen();
   }
 
-  // ==========================================
+
   // PROFILE PAGE
-  // ==========================================
+
 
   Widget _buildProfilePage() {
     return SingleChildScrollView(
@@ -601,9 +601,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ==========================================
+ 
   // REUSABLE WIDGETS
-  // ==========================================
+  
 
   Widget _buildStatCard(String title, String value, IconData icon) {
     return Container(
@@ -727,9 +727,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ==========================================
+
   // DIALOGS
-  // ==========================================
+
 
   void _showComingSoon(String feature) {
     ScaffoldMessenger.of(

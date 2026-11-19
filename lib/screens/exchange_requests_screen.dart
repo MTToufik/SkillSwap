@@ -17,7 +17,6 @@ class _ExchangeRequestsScreenState extends State<ExchangeRequestsScreen> {
 
   // SEND EXCHANGE REQUEST
 
-
   Future<void> _openRequestDialog(
     Map<String, dynamic> profile,
     String requestedSkill,
@@ -223,9 +222,7 @@ class _ExchangeRequestsScreenState extends State<ExchangeRequestsScreen> {
     noteController.dispose();
   }
 
-  
   // FIND PARTNERS
-
 
   Widget _buildFindPartners() {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -366,9 +363,7 @@ class _ExchangeRequestsScreenState extends State<ExchangeRequestsScreen> {
     );
   }
 
-
   // REQUEST LIST
-
 
   Widget _buildRequestList({required bool received}) {
     final stream = received
@@ -463,9 +458,7 @@ class _ExchangeRequestsScreenState extends State<ExchangeRequestsScreen> {
     );
   }
 
-
   // REQUEST CARD
- 
 
   Widget _buildRequestCard({
     required String requestId,
@@ -634,9 +627,7 @@ class _ExchangeRequestsScreenState extends State<ExchangeRequestsScreen> {
     );
   }
 
- 
   // UPDATE STATUS
-
 
   Future<void> _updateStatus(String requestId, String status) async {
     try {
@@ -659,9 +650,7 @@ class _ExchangeRequestsScreenState extends State<ExchangeRequestsScreen> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
- 
   // MAIN SCREEN
-
 
   @override
   Widget build(BuildContext context) {

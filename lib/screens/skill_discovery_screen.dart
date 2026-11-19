@@ -26,9 +26,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
 
   final Color primaryColor = const Color(0xFF5B5FEF);
 
-
   // INITIALIZE
-
 
   @override
   void initState() {
@@ -37,9 +35,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     _myProfileFuture = _discoveryService.getCurrentUserProfile();
   }
 
-
   // REFRESH CURRENT PROFILE
-
 
   void _refreshMyProfile() {
     setState(() {
@@ -47,9 +43,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     });
   }
 
- 
   // FILTER AND SORT PROFILES
-
 
   List<Map<String, dynamic>> _filterProfiles(
     List<Map<String, dynamic>> profiles,
@@ -125,9 +119,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     return result;
   }
 
-
   // DISPOSE
-
 
   @override
   void dispose() {
@@ -135,9 +127,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     super.dispose();
   }
 
-
   // BUILD
-
 
   @override
   Widget build(BuildContext context) {
@@ -279,9 +269,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     );
   }
 
-
   // ERROR STATE
-
 
   Widget _buildErrorState(String message) {
     return Center(
@@ -309,7 +297,6 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
   }
 
   // MISSING PROFILE STATE
-
 
   Widget _buildMissingProfileState() {
     return Center(
@@ -348,9 +335,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     );
   }
 
-
   // EMPTY STATE
-
 
   Widget _buildEmptyState() {
     final isMatchFilter = _selectedFilter == 'Matches';
@@ -386,9 +371,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     );
   }
 
-
   // FILTER CHIP
-
 
   Widget _buildFilterChip(String label) {
     final selected = _selectedFilter == label;
@@ -414,7 +397,6 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
 
   // MATCH SCORE COLOR
 
-
   Color _getMatchColor(int score) {
     if (score == 100) {
       return Colors.green;
@@ -427,9 +409,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     return Colors.grey;
   }
 
-
   // MATCH SCORE BADGE
- 
 
   Widget _buildMatchBadge(int score) {
     final color = _getMatchColor(score);
@@ -462,9 +442,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     );
   }
 
-
   // MATCH DETAILS DIALOG
-
 
   void _showMatchDetailsDialog(Map<String, dynamic> profile) {
     final matchDetails = Map<String, dynamic>.from(
@@ -571,9 +549,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     );
   }
 
-
   // MATCH DETAIL SECTION
-
 
   Widget _buildMatchDetailSection({
     required String title,
@@ -627,9 +603,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     );
   }
 
-
   // SEND EXCHANGE REQUEST
-
 
   Future<void> _showExchangeRequestDialog(Map<String, dynamic> profile) async {
     final currentUser = FirebaseAuth.instance.currentUser;
@@ -937,9 +911,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     }
   }
 
-
   // PROFILE CARD
- 
 
   Widget _buildProfileCard(Map<String, dynamic> profile) {
     final name = (profile['name'] ?? 'SkillSwap User').toString();
@@ -1145,9 +1117,7 @@ class _SkillDiscoveryScreenState extends State<SkillDiscoveryScreen> {
     );
   }
 
-
   // SKILL TAGS
-  
 
   Widget _buildSkillTags(List<String> skills) {
     if (skills.isEmpty) {

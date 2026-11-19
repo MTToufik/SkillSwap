@@ -15,7 +15,6 @@ class ExchangeRequestService {
 
   // GET CURRENT USER PROFILE
 
-
   Future<Map<String, dynamic>> getCurrentUserProfile() async {
     final user = currentUser;
 
@@ -32,25 +31,19 @@ class ExchangeRequestService {
     return snapshot.data() ?? {};
   }
 
-
   // GET MY PROFILE
-
 
   Future<Map<String, dynamic>> getMyProfile() async {
     return getCurrentUserProfile();
   }
 
- 
   // STREAM PUBLIC PROFILES
-
 
   Stream<QuerySnapshot<Map<String, dynamic>>> streamProfiles() {
     return _profiles.snapshots();
   }
 
- 
   // STREAM RECEIVED REQUESTS
- 
 
   Stream<QuerySnapshot<Map<String, dynamic>>> streamReceivedRequests() {
     final user = currentUser;
@@ -62,9 +55,7 @@ class ExchangeRequestService {
     return _requests.where('receiverId', isEqualTo: user.uid).snapshots();
   }
 
-
   // STREAM SENT REQUESTS
-  
 
   Stream<QuerySnapshot<Map<String, dynamic>>> streamSentRequests() {
     final user = currentUser;
@@ -76,9 +67,7 @@ class ExchangeRequestService {
     return _requests.where('senderId', isEqualTo: user.uid).snapshots();
   }
 
-  
   // SEND EXCHANGE REQUEST
-
 
   Future<void> sendRequest({
     required String receiverId,
@@ -170,9 +159,7 @@ class ExchangeRequestService {
     });
   }
 
-
   // ACCEPT, REJECT OR CANCEL REQUEST
-  
 
   Future<void> updateRequestStatus({
     required String requestId,

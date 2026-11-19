@@ -16,7 +16,6 @@ class ChatService {
   }
 
   // CHAT LIST STREAM
- 
 
   Stream<List<Map<String, dynamic>>> getChats() {
     return _firestore
@@ -41,9 +40,7 @@ class ChatService {
         });
   }
 
-
   // SYNC ACCEPTED CHATS
-
 
   Future<void> syncAcceptedChats() async {
     final uid = _uid;
@@ -100,9 +97,7 @@ class ChatService {
     }
   }
 
- 
   // CREATE CHAT FROM EXCHANGE REQUEST
-
 
   Future<void> _createChatFromExchangeRequest(
     String requestId,
@@ -121,9 +116,7 @@ class ChatService {
     );
   }
 
-  
   // CREATE CHAT FROM SESSION
-
 
   Future<void> _createChatFromSession(
     String sessionId,
@@ -142,9 +135,7 @@ class ChatService {
     );
   }
 
- 
   // CREATE OR GET CHAT
-
 
   Future<String> _createOrGetChat({
     required String firstUserId,
@@ -208,9 +199,7 @@ class ChatService {
     return chatId;
   }
 
-
   // GET MESSAGES STREAM
- 
 
   Stream<List<Map<String, dynamic>>> getMessages(String chatId) {
     return _firestore
@@ -226,9 +215,7 @@ class ChatService {
         });
   }
 
-
   // SEND MESSAGE
-
 
   Future<void> sendMessage({
     required String chatId,
@@ -280,9 +267,7 @@ class ChatService {
     }
   }
 
-
   // MARK MESSAGES AS READ
- 
 
   Future<void> markMessagesAsRead(String chatId) async {
     final uid = _uid;

@@ -4,9 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 class SkillDiscoveryService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-
   // GET ALL PUBLIC PROFILES
- 
 
   Stream<List<Map<String, dynamic>>> getPublicProfiles() {
     return _firestore
@@ -20,9 +18,7 @@ class SkillDiscoveryService {
         });
   }
 
-
   // GET CURRENT USER PROFILE
-  
 
   Future<Map<String, dynamic>?> getCurrentUserProfile() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -43,9 +39,7 @@ class SkillDiscoveryService {
     return {...snapshot.data()!, 'uid': snapshot.id};
   }
 
-
   // GET ONE USER PROFILE
-
 
   Future<Map<String, dynamic>?> getUserProfile(String uid) async {
     final snapshot = await _firestore
@@ -60,9 +54,7 @@ class SkillDiscoveryService {
     return {...snapshot.data()!, 'uid': snapshot.id};
   }
 
-
   // CONVERT FIRESTORE SKILLS TO STRING LIST
-
 
   List<String> _getSkills(dynamic value) {
     if (value is! List) {
@@ -79,7 +71,6 @@ class SkillDiscoveryService {
 
   // FIND COMMON SKILLS
   // CASE-INSENSITIVE MATCHING
-
 
   List<String> _findCommonSkills(
     List<String> firstSkills,
@@ -102,9 +93,7 @@ class SkillDiscoveryService {
     return matchedSkills.toSet().toList();
   }
 
-
   // CALCULATE COMPLEMENTARY MATCH
- 
 
   Map<String, dynamic> calculateMatch(
     Map<String, dynamic> currentProfile,
@@ -150,7 +139,6 @@ class SkillDiscoveryService {
   }
 
   // GET MATCH SCORE ONLY
-
 
   int getMatchScore(
     Map<String, dynamic> currentProfile,

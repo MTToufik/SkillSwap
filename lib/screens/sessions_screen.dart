@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../services/session_service.dart';
 import '../services/auth_service.dart';
+import '../services/review_service.dart';
+import 'rating_review_screen.dart';
 
 class SessionsScreen extends StatefulWidget {
   const SessionsScreen({super.key});
@@ -14,6 +16,7 @@ class SessionsScreen extends StatefulWidget {
 class _SessionsScreenState extends State<SessionsScreen> {
   final SessionService _sessionService = SessionService();
   final AuthService _authService = AuthService();
+  final ReviewService _reviewService = ReviewService();
 
   static const Color primaryColor = Color(0xFF5B5FEF);
 
@@ -30,7 +33,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
     );
   }
 
-  // Select a date, time and send a session request.
   Future<void> _scheduleSession({
     required String teacherId,
     required String teacherName,
@@ -39,9 +41,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
     final noteController = TextEditingController();
 
     DateTime selectedDate = DateTime.now().add(const Duration(days: 1));
-
     TimeOfDay selectedTime = const TimeOfDay(hour: 10, minute: 0);
-
     DateTime? scheduledAt;
 
     try {
@@ -61,13 +61,11 @@ class _SessionsScreenState extends State<SessionsScreen> {
                       const SizedBox(height: 6),
                       Text('Skill: $skill'),
                       const SizedBox(height: 20),
-
                       const Text(
                         'Select Date',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
-
                       OutlinedButton.icon(
                         onPressed: () async {
                           final date = await showDatePicker(
@@ -80,9 +78,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                           );
 
                           if (date != null) {
-                            setDialogState(() {
-                              selectedDate = date;
-                            });
+                            setDialogState(() => selectedDate = date);
                           }
                         },
                         icon: const Icon(Icons.calendar_month),
@@ -90,15 +86,12 @@ class _SessionsScreenState extends State<SessionsScreen> {
                           '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                         ),
                       ),
-
                       const SizedBox(height: 15),
-
                       const Text(
                         'Select Time',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
-
                       OutlinedButton.icon(
                         onPressed: () async {
                           final time = await showTimePicker(
@@ -107,23 +100,18 @@ class _SessionsScreenState extends State<SessionsScreen> {
                           );
 
                           if (time != null) {
-                            setDialogState(() {
-                              selectedTime = time;
-                            });
+                            setDialogState(() => selectedTime = time);
                           }
                         },
                         icon: const Icon(Icons.access_time),
                         label: Text(selectedTime.format(context)),
                       ),
-
                       const SizedBox(height: 15),
-
                       const Text(
                         'Message to Teacher (Optional)',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
-
                       TextField(
                         controller: noteController,
                         maxLines: 3,
@@ -133,7 +121,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
                           border: OutlineInputBorder(),
                         ),
                       ),
-
                       const Text(
                         'Session duration: 60 minutes',
                         style: TextStyle(color: Colors.grey),
@@ -143,9 +130,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                 ),
                 actions: [
                   TextButton(
-                    onPressed: () {
-                      Navigator.pop(dialogContext, false);
-                    },
+                    onPressed: () => Navigator.pop(dialogContext, false),
                     child: const Text('Cancel'),
                   ),
                   ElevatedButton(
@@ -179,9 +164,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         },
       );
 
-      if (result != true || scheduledAt == null || !mounted) {
-        return;
-      }
+      if (result != true || scheduledAt == null || !mounted) return;
 
       await _sessionService.createSession(
         teacherId: teacherId,
@@ -191,8 +174,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
         note: noteController.text,
       );
 
-      if (!mounted) return;
-
       await _showMessage('Session request sent successfully!');
     } catch (e) {
       await _showMessage('Could not schedule session: $e', error: true);
@@ -201,7 +182,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
     }
   }
 
-  // Update session status.
   Future<void> _changeStatus(String sessionId, String status) async {
     try {
       await _sessionService.updateSessionStatus(
@@ -215,7 +195,70 @@ class _SessionsScreenState extends State<SessionsScreen> {
     }
   }
 
-  // Find teachers from publicProfiles.
+  Future<void> _openReview({
+    required String sessionId,
+    required String revieweeId,
+    required String revieweeName,
+    required String skill,
+  }) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RatingReviewScreen(
+          sessionId: sessionId,
+          revieweeId: revieweeId,
+          revieweeName: revieweeName,
+          skill: skill,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRatingSummary(String userId) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _reviewService.streamReviewsForUser(userId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Row(
+            children: [
+              Icon(Icons.star_border, color: Colors.amber, size: 18),
+              SizedBox(width: 4),
+              Text(
+                'No ratings yet',
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            ],
+          );
+        }
+
+        final reviews = snapshot.data!.docs;
+        final total = reviews.fold<double>(
+          0,
+          (totalRating, review) =>
+              totalRating +
+              ((review.data()['rating'] as num?)?.toDouble() ?? 0),
+        );
+
+        final average = total / reviews.length;
+
+        return Row(
+          children: [
+            const Icon(Icons.star, color: Colors.amber, size: 18),
+            const SizedBox(width: 4),
+            Text(
+              '${average.toStringAsFixed(1)} (${reviews.length} reviews)',
+              style: const TextStyle(
+                color: Colors.black54,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildTeacherDiscovery() {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
@@ -231,9 +274,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         }
 
         final teachers = snapshot.data!.docs.where((doc) {
-          final data = doc.data();
-
-          final skills = List<String>.from(data['skillsToTeach'] ?? []);
+          final skills = List<String>.from(doc.data()['skillsToTeach'] ?? []);
 
           return doc.id != _currentUid && skills.isNotEmpty;
         }).toList();
@@ -257,9 +298,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         return Column(
           children: teachers.map((teacher) {
             final data = teacher.data();
-
             final name = data['name'] as String? ?? 'SkillSwap User';
-
             final skills = List<String>.from(data['skillsToTeach'] ?? []);
 
             return Container(
@@ -298,6 +337,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 7),
+                  _buildRatingSummary(teacher.id),
                   const SizedBox(height: 15),
                   const Text(
                     'Teaching Skills',
@@ -342,7 +383,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
     );
   }
 
-  // Session status color.
   Color _statusColor(String status) {
     switch (status) {
       case 'accepted':
@@ -362,12 +402,58 @@ class _SessionsScreenState extends State<SessionsScreen> {
     if (value is! Timestamp) return 'Date unavailable';
 
     final date = value.toDate();
-
     final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
     final minute = date.minute.toString().padLeft(2, '0');
     final period = date.hour >= 12 ? 'PM' : 'AM';
 
     return '${date.day}/${date.month}/${date.year} at $hour:$minute $period';
+  }
+
+  Widget _buildReviewAction({
+    required String sessionId,
+    required String revieweeId,
+    required String revieweeName,
+    required String skill,
+  }) {
+    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      future: _reviewService.getMyReview(sessionId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.hasError) {
+          return const SizedBox.shrink();
+        }
+
+        if (snapshot.data!.exists) {
+          return const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 19),
+              SizedBox(width: 7),
+              Text(
+                'Review submitted',
+                style: TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          );
+        }
+
+        return ElevatedButton.icon(
+          onPressed: () => _openReview(
+            sessionId: sessionId,
+            revieweeId: revieweeId,
+            revieweeName: revieweeName,
+            skill: skill,
+          ),
+          icon: const Icon(Icons.star_outline),
+          label: const Text('Rate & Review'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primaryColor,
+            foregroundColor: Colors.white,
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildSessionCard(
@@ -382,6 +468,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
     final isTeacher = _currentUid == teacherId;
     final isLearner = _currentUid == learnerId;
 
+    final otherId = isTeacher ? learnerId : teacherId;
     final otherName = isTeacher
         ? data['learnerName'] as String? ?? 'Learner'
         : data['teacherName'] as String? ?? 'Teacher';
@@ -464,7 +551,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
           ],
           const SizedBox(height: 15),
 
-          // Teacher actions.
           if (isTeacher && status == 'pending')
             Wrap(
               spacing: 10,
@@ -484,7 +570,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
               ],
             ),
 
-          // Learner can cancel pending or accepted requests.
           if (isLearner && (status == 'pending' || status == 'accepted'))
             OutlinedButton(
               onPressed: () => _changeStatus(document.id, 'cancelled'),
@@ -492,7 +577,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
               child: const Text('Cancel Session'),
             ),
 
-          // Teacher can complete an accepted session.
           if (isTeacher && status == 'accepted')
             ElevatedButton.icon(
               onPressed: () => _changeStatus(document.id, 'completed'),
@@ -503,6 +587,16 @@ class _SessionsScreenState extends State<SessionsScreen> {
                 foregroundColor: Colors.white,
               ),
             ),
+
+          if (status == 'completed') ...[
+            const Divider(height: 25),
+            _buildReviewAction(
+              sessionId: document.id,
+              revieweeId: otherId,
+              revieweeName: otherName,
+              skill: skill,
+            ),
+          ],
         ],
       ),
     );
@@ -526,7 +620,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
           final aDate = a.data()['scheduledAt'] as Timestamp?;
           final bDate = b.data()['scheduledAt'] as Timestamp?;
 
-          return (aDate?.compareTo(bDate ?? Timestamp(0, 0)) ?? 0);
+          return aDate?.compareTo(bDate ?? Timestamp(0, 0)) ?? 0;
         });
 
         if (documents.isEmpty) {
@@ -585,23 +679,18 @@ class _SessionsScreenState extends State<SessionsScreen> {
               style: TextStyle(color: Colors.grey, height: 1.5),
             ),
             const SizedBox(height: 25),
-
             const Text(
               'Find a Teacher',
               style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 14),
-
             _buildTeacherDiscovery(),
-
             const SizedBox(height: 30),
-
             const Text(
               'My Sessions',
               style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 14),
-
             _buildMySessions(),
             const SizedBox(height: 25),
           ],

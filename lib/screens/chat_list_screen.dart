@@ -35,9 +35,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
   }
 
-
   // SYNC ACCEPTED CHATS
-
 
   Future<void> _syncChats() async {
     if (_currentUid.isEmpty || _isSyncing) return;
@@ -72,17 +70,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }
   }
 
-
   // REFRESH
-
 
   Future<void> _refreshChats() async {
     await _syncChats();
   }
 
-
   // GET OTHER USER ID
- 
 
   String _otherUserId(Map<String, dynamic> chat) {
     final ids = List<String>.from(chat['participantIds'] ?? []);
@@ -90,9 +84,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     return ids.firstWhere((id) => id != _currentUid, orElse: () => '');
   }
 
-
   // GET OTHER USER NAME
-
 
   String _otherUserName(Map<String, dynamic> chat) {
     final otherId = _otherUserId(chat);
@@ -102,9 +94,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     return (names[otherId] ?? 'SkillSwap User').toString();
   }
 
-
   // FORMAT TIME
- 
 
   String _formatTime(dynamic value) {
     if (value is! Timestamp) return '';
@@ -125,9 +115,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     return '${date.day}/${date.month}/${date.year}';
   }
 
-
   // OPEN CHAT
- 
 
   void _openChat(Map<String, dynamic> chat) {
     final otherId = _otherUserId(chat);
@@ -148,9 +136,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-
   // SYNC ERROR BANNER
-
 
   Widget _buildSyncError() {
     if (_syncError == null) {
@@ -197,9 +183,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  
   // EMPTY CHAT LIST
-
 
   Widget _buildEmptyChats() {
     return ListView(
@@ -229,9 +213,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
- 
   // CHAT LIST ITEM
-
 
   Widget _buildChatItem(Map<String, dynamic> chat) {
     final otherName = _otherUserName(chat);
@@ -314,9 +296,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-
   // BUILD
-  
 
   @override
   Widget build(BuildContext context) {
